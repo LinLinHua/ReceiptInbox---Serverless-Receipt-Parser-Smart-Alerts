@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ReceiptInbox Backend Infrastructure
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.9
+
+Resources:
+  # --- 1. S3 Bucket for Raw Files ---
+  ReceiptBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # REMINDER: If you changed this name before to make it unique, use that name here!
+      BucketName: receipt-inbox-uploads-linlinhua-dev  
+
+  # --- 2. DynamoDB Table for Metadata ---
+  ReceiptsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ReceiptMetadata
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: receipt_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: receipt_id
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+
+  # --- 3. SQS Queue for Background Jobs (NEW) ---
+  ReceiptQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: receipt-processing-queue
+
+  # --- 4. API Gateway + Lambda Function ---
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: main.handler
+      CodeUri: ./src
+      Policies:
+        # Permission to write files to S3 [cite: 119]
+        - S3WritePolicy:
+            BucketName: !Ref ReceiptBucket
+        # Permission to update status in DynamoDB [cite: 119]
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReceiptsTable
+        # Permission to read DB credentials
+        - SecretsManagerReadWrite 
+        # Permission to send messages to SQS (NEW) [cite: 63]
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt ReceiptQueue.QueueName
+      Environment:
+        Variables:
+          RECEIPT_BUCKET_NAME: !Ref ReceiptBucket
+          # Pass the Queue URL to the code (NEW)
+          SQS_QUEUE_URL: !Ref ReceiptQueue 
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+  QueueUrl:
+    Description: "SQS Queue URL"
+    Value: !Ref ReceiptQueue

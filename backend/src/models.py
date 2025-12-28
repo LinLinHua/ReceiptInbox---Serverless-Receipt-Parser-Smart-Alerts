@@ -50,9 +50,7 @@ Base = declarative_base()
 
 # --- 4. Define Models ---
 class User(Base):
-    """
-    Stores user authentication data in PostgreSQL on EC2.
-    """
+    
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, index=True)

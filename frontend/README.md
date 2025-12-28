@@ -1,18 +1,42 @@
-## Follow these steps to do simple frontend testing:
+# Receipt Processing Frontend
 
-1. start (test) server: python test/server.py
-2. install required js packages: npm install
-3. start frontend web app: npm start
-4. do functionality test on web page
-5. check python server logs and browser console messages
+React-based web application for receipt management with ML-powered categorization.
 
-## Current progress
+## Setup
 
--   basic frame/implementation for most planned functionalities
--   capable of transfering (image) files through 'axios'
+```bash
+npm install
+npm start
+```
 
-## TODO
+Open http://localhost:3000
 
--   test with deployed server to ensure basic functionality
--   complete 'Statistic' tab (present the analysis info passed by backend)
--   add more functionalities: verify upload files (text extraction), modify uploaded data before being fed to ML module for analysis
+## Configuration
+
+Update `src/constants.js` with your API Gateway URL:
+```javascript
+export const BASE_URL = "https://your-api-gateway-url";
+```
+
+## Build for Production
+
+```bash
+npm run build
+```
+
+## Features
+
+- User authentication
+- Receipt upload (drag-and-drop)
+- Real-time processing status
+- Analytics dashboard
+- Anomaly alerts
+- Email notifications
+
+## Tech Stack
+
+- React 18
+- Ant Design
+- Recharts
+- Axios
+- React Router

@@ -4,6 +4,7 @@
 @import "./Register.css";
 @import "./Dashboard.css";
 @import "./PostForm.css";
+@import "./Uploader.css";
 
 body {
   margin: 0;

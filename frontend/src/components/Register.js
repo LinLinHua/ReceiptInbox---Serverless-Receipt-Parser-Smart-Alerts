@@ -50,7 +50,6 @@ function Register(props) {
     axios(opt)
       .then((response) => {
         console.log(response);
-        // case1: registered success
         if (response.status === 200) {
           message.success("Registration succeeded!");
           navigate("/login");

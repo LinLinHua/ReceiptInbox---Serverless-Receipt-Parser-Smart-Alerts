@@ -1,2 +1,1 @@
-export const TOKEN_KEY = "token";
-export const BASE_URL = "http://localhost:8000";
+export const BASE_URL = "http://98.95.100.8:8000";

@@ -1,9 +1,9 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "sam-app"
+stack_name = "receiptinbox-ml-stack"
 resolve_s3 = true
-s3_prefix = "sam-app"
+s3_prefix = "receiptinbox-ml-stack"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 disable_rollback = true

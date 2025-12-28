@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./Login";
 import Register from "./Register";
 import Dashboard from "./Dashboard";
+import Uploader from "./Uploader";
 
 function Main(props) {
   const { isLoggedIn, handleLoggedIn } = props;
@@ -24,6 +25,10 @@ function Main(props) {
     return isLoggedIn ? <Dashboard /> : <Navigate to="/login" />;
   };
 
+  const showUploader = () => {
+    return isLoggedIn ? <Uploader /> : <Navigate to="/login" />;
+  };
+
   const showHome = () => {
     return isLoggedIn ? <Navigate to="/dashboard" /> : <Navigate to="/login" />;
   };
@@ -35,6 +40,7 @@ function Main(props) {
         <Route path="/login" element={showLogin()} />
         <Route path="/register" element={showRegister()} />
         <Route path="/dashboard" element={showDashboard()} />
+        <Route path="/upload" element={showUploader()} />
         <Route path="*" element={showHome()} />
       </Routes>
     </div>

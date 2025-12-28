@@ -1,9 +1,7 @@
 fastapi
 mangum
 boto3
-sqlalchemy
-psycopg2-binary
 uvicorn
 pydantic
-passlib[bcrypt]
 python-jose[cryptography]
+python-multipart

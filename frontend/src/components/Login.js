@@ -12,15 +12,17 @@ function Login(props) {
   const onFinish = (values) => {
     console.log("values", values);
     const { username, password } = values;
+
     const option = {
       method: "POST",
-      url: `${BASE_URL}/signin`,
+      url: `${BASE_URL}/login`,
       data: {
         username: username,
         password: password,
       },
       headers: { "Content-Type": "application/json" },
     };
+
     axios(option)
       .then((res) => {
         if (res.status === 200) {

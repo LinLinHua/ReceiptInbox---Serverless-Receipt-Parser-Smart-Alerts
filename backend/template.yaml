@@ -5,21 +5,20 @@ Description: ReceiptInbox Backend Infrastructure
 Globals:
   Function:
     Timeout: 10
-    Runtime: python3.9
+    Runtime: python3.10
 
 Resources:
   # --- 1. S3 Bucket for Raw Files ---
   ReceiptBucket:
     Type: AWS::S3::Bucket
     Properties:
-      # REMINDER: If you changed this name before to make it unique, use that name here!
-      BucketName: receipt-inbox-uploads-linlinhua-dev  
+      BucketName: receipt-inbox-uploads-ml-stack-v2
 
   # --- 2. DynamoDB Table for Metadata ---
   ReceiptsTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: ReceiptMetadata
+      TableName: ReceiptMetadata-ML-v2
       AttributeDefinitions:
         - AttributeName: user_id
           AttributeType: S
@@ -32,11 +31,24 @@ Resources:
           KeyType: RANGE
       BillingMode: PAY_PER_REQUEST
 
-  # --- 3. SQS Queue for Background Jobs (NEW) ---
-  ReceiptQueue:
-    Type: AWS::SQS::Queue
+  # --- 2b. DynamoDB Table for Users ---
+  UsersTable:
+    Type: AWS::DynamoDB::Table
     Properties:
-      QueueName: receipt-processing-queue
+      TableName: Users-ML-v2
+      AttributeDefinitions:
+        - AttributeName: username
+          AttributeType: S
+      KeySchema:
+        - AttributeName: username
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  # --- 3. SQS Queue - USING EXISTING QUEUE ---
+  # ReceiptQueue:
+  #   Type: AWS::SQS::Queue
+  #   Properties:
+  #     QueueName: receipt-processing-queue
 
   # --- 4. API Gateway + Lambda Function ---
   ApiFunction:
@@ -51,27 +63,115 @@ Resources:
         # Permission to update status in DynamoDB [cite: 119]
         - DynamoDBCrudPolicy:
             TableName: !Ref ReceiptsTable
+        # Permission to access Users table
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
         # Permission to read DB credentials
         - SecretsManagerReadWrite 
         # Permission to send messages to SQS (NEW) [cite: 63]
         - SQSSendMessagePolicy:
-            QueueName: !GetAtt ReceiptQueue.QueueName
+            QueueName: receipt-processing-queue
+        # Permission to publish SNS notifications
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+                - sns:Subscribe
+              Resource: !Ref AnomalyNotificationTopic
       Environment:
         Variables:
           RECEIPT_BUCKET_NAME: !Ref ReceiptBucket
           # Pass the Queue URL to the code (NEW)
-          SQS_QUEUE_URL: !Ref ReceiptQueue 
+          SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/112241424533/receipt-processing-queue
+          ANOMALY_TOPIC_ARN: !Ref AnomalyNotificationTopic
       Events:
-        ApiEvent:
-          Type: Api
+        HttpApiEvent:
+          Type: HttpApi
           Properties:
             Path: /{proxy+}
             Method: ANY
+            ApiId: !Ref HttpApi
+
+  # HTTP API with CORS support
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "http://localhost:3000"
+          - "https://receipt-inbox-app.netlify.app"
+        AllowHeaders:
+          - "*"
+        AllowMethods:
+          - "*"
+        AllowCredentials: false
+
+
+  # --- 5. ML Processor Lambda (NEW) ---
+  MLProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: sqs_handler.handler
+      CodeUri: ../ml
+      Runtime: python3.10
+      Timeout: 120  # Reduced from 300 (2 minutes is enough)
+      MemorySize: 2048  # Increased from 512 for faster processing
+      Policies:
+        # Read from S3 bucket
+        - S3ReadPolicy:
+            BucketName: !Ref ReceiptBucket
+        # Write Rekognition output back to S3 (optional)
+        - S3WritePolicy:
+            BucketName: !Ref ReceiptBucket
+        # Update DynamoDB with results
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReceiptsTable
+        # Rekognition and Bedrock permissions
+        - Statement:
+            - Effect: Allow
+              Action:
+                - rekognition:DetectText
+                - bedrock:InvokeModel
+              Resource: '*'
+        # SNS publish permission for anomaly notifications
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref AnomalyNotificationTopic
+      Environment:
+        Variables:
+          S3_BUCKET_RECEIPTS: !Ref ReceiptBucket
+          S3_BUCKET_OUTPUT: !Ref ReceiptBucket
+          DYNAMODB_TABLE: !Ref ReceiptsTable
+          BEDROCK_MODEL_ID: "anthropic.claude-3-haiku-20240307-v1:0"
+          HIGH_TOTAL_THRESHOLD: "200.0"
+          LOG_LEVEL: INFO
+          ANOMALY_TOPIC_ARN: !Ref AnomalyNotificationTopic
+          # Cross-account Bedrock credentials (SET THESE VIA AWS CONSOLE)
+          # BEDROCK_ACCESS_KEY: "YOUR_KEY_HERE"
+          # BEDROCK_SECRET_KEY: "YOUR_SECRET_HERE"
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: arn:aws:sqs:us-east-1:112241424533:receipt-processing-queue
+            BatchSize: 1
+
+  # --- SNS Topic for Anomaly Notifications ---
+  AnomalyNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: receipt-anomaly-notifications
+      DisplayName: Receipt Anomaly Alerts
 
 Outputs:
   ApiUrl:
     Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
-  QueueUrl:
-    Description: "SQS Queue URL"
-    Value: !Ref ReceiptQueue
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+  MLFunctionArn:
+    Description: "ML Processor Lambda ARN"
+    Value: !GetAtt MLProcessorFunction.Arn
+  AnomalyTopicArn:
+    Description: "SNS Topic ARN for anomaly notifications"
+    Value: !Ref AnomalyNotificationTopic

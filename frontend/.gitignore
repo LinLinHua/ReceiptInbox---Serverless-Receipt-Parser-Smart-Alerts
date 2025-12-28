@@ -23,3 +23,9 @@ yarn-debug.log*
 yarn-error.log*
 
 .prettierrc
+
+test/
+
+ee547_ec2_key.pem
+package-lock.json
+deploy.sh

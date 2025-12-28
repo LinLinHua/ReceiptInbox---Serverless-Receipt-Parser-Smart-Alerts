@@ -13,8 +13,7 @@ import { useNavigate } from "react-router-dom";
 import Receipt from "@mui/icons-material/Receipt";
 import LogoutIcon from "@mui/icons-material/Logout";
 
-const pages = ["Dashboard"];
-// TODO: more pages?
+const pages = ["Dashboard", "Upload"];
 
 function ResponsiveAppBar(props) {
   const { isLoggedIn, handleLogout } = props;
